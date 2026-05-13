@@ -5,9 +5,11 @@ import com.sm.spring_boot_notes.database.model.User
 import com.sm.spring_boot_notes.database.repository.RefreshTokenRepository
 import com.sm.spring_boot_notes.database.repository.UserRepository
 import org.bson.types.ObjectId
+import org.springframework.http.HttpStatusCode
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.server.ResponseStatusException
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.Base64
@@ -54,28 +56,36 @@ class AuthService(
 
     /**
      *
-     * The "ACID" Concept
+     * Data Integrity (The "ACID" Concept):
+     *     Atomicity:"All or Nothing","If saving a new token fails, the old one isn't deleted."
+     *     Consistency:"Valid State",Data must follow all schema rules and constraints.
+     *     Isolation:"No Interference","Concurrent requests won't see ""half-finished"" updates."
+     *     Durability:"Permanent","Once a transaction is committed, it survives system crashes."
+     *
      * When you mark a function as @Transactional, it follows the ACID properties. The most important one here is Atomicity.
      *
      * Success: If every line of code in the function finishes without an error, the database changes are Committed (saved permanently).
      *
      * Failure: If an exception is thrown anywhere (like your IllegalArgumentException), the database undergoes a Rollback.
      * Every database change made during that function call is undone as if it never happened.
+     *
+     *
+
      */
     @Transactional
     fun refresh(refreshToken: String): TokenPair {
         if (!jwtService.validateRefreshToken(refreshToken)) {
-            throw IllegalArgumentException("Invalid refresh token..")
+            throw ResponseStatusException(HttpStatusCode.valueOf(401),"Invalid Refresh Token.")
         }
 
         val userId = jwtService.getUserIdFromToken(refreshToken)
         val user = userRepository.findById(ObjectId(userId)).orElseThrow {
-            IllegalArgumentException("Invalid Refresh token.")
+            ResponseStatusException(HttpStatusCode.valueOf(401),"Invalid Refresh Token.") //404
         }
 
         val hashed = hashToken(refreshToken)
         refreshTokenRepository.findByUserIdAndHashedToken(user.id, hashed)
-            ?: throw IllegalArgumentException("Refresh token not recognized (maybe used or expired?)")
+            ?: throw  ResponseStatusException(HttpStatusCode.valueOf(401),"Refresh token not recognized (maybe used or expired?)")
 
         refreshTokenRepository.deleteByUserIdAndHashedToken(user.id, hashed)
 
