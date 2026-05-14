@@ -5,6 +5,7 @@ import com.sm.spring_boot_notes.database.repository.NoteRepository
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import org.bson.types.ObjectId
+import org.springframework.http.HttpStatus
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 
 
@@ -70,17 +72,30 @@ class NoteController(
         }
     }
 
+    @GetMapping(path=["/{id}"])
+    fun findById(@PathVariable("id") id: String): NoteResponse {
+        val ownerId = SecurityContextHolder.getContext().authentication?.principal as? String
+        val note = noteRepository.findById(ObjectId(id)).orElseThrow {
+            ResponseStatusException(HttpStatus.NOT_FOUND, "Note not found")
+        }
+        if (note.ownerId.toHexString() != ownerId) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Note not found")
+        }
+        return note.toResponse()
+    }
+
     @DeleteMapping(path=["/{id}"])
     fun deleteById(@PathVariable("id") id: String) {
         val note = noteRepository.findById(ObjectId(id)).orElseThrow {
-            IllegalArgumentException("Note not found")
+            ResponseStatusException(HttpStatus.NOT_FOUND, "Note not found")
         }
 
         val ownerId = SecurityContextHolder.getContext().authentication?.principal as? String
 
-        if(note.ownerId.toHexString() == ownerId){
-            noteRepository.deleteById(ObjectId(id))
+        if (note.ownerId.toHexString() != ownerId) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "You don't own this note")
         }
+        noteRepository.deleteById(ObjectId(id))
     }
 
 //    @GetMapping
