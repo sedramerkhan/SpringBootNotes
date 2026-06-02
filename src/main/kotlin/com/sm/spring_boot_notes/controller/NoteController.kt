@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
@@ -34,6 +35,7 @@ class NoteController(
         val title: String,
         val content: String,
         val color: Long,
+        val isImportant: Boolean? = null,
     )
 
     data class NoteResponse(
@@ -41,7 +43,8 @@ class NoteController(
         val title: String,
         val content: String,
         val color: Long,
-        val createdAt: Instant
+        val createdAt: Instant,
+        val isImportant: Boolean,
     )
 
 
@@ -57,19 +60,22 @@ class NoteController(
                 content = body.content,
                 color = body.color,
                 createdAt = Instant.now(),
-                ownerId = ObjectId(ownerId)
-
+                ownerId = ObjectId(ownerId),
+                isImportant = body.isImportant ?: false,
             ))
 
         return note.toResponse()
     }
 
     @GetMapping
-    fun findByOwnerId(): List<NoteResponse> {
+    fun findByOwnerId(@RequestParam important: Boolean?): List<NoteResponse> {
         val ownerId = SecurityContextHolder.getContext().authentication?.principal as? String
-        return noteRepository.findByOwnerId(ObjectId(ownerId)).map {
-            it.toResponse()
+        val notes = if (important == true) {
+            noteRepository.findByOwnerIdAndIsImportant(ObjectId(ownerId), true)
+        } else {
+            noteRepository.findByOwnerId(ObjectId(ownerId))
         }
+        return notes.map { it.toResponse() }
     }
 
     @GetMapping(path=["/{id}"])
@@ -106,13 +112,13 @@ class NoteController(
 //        }
 //    }
 
-    private fun Note.toResponse(): NoteController.NoteResponse =
-        NoteResponse(
-            id = id.toHexString(),
-            title = title,
-            content = content,
-            color = color,
-            createdAt = createdAt,
-        )
+    private fun Note.toResponse() = NoteResponse(
+        id = id.toHexString(),
+        title = title,
+        content = content,
+        color = color,
+        createdAt = createdAt,
+        isImportant = isImportant,
+    )
 
 }

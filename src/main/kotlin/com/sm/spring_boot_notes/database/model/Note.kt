@@ -12,5 +12,6 @@ data class Note(
     val color: Long,
     val createdAt: Instant,
     val ownerId: ObjectId,
+    val isImportant: Boolean = false,
     @Id val id: ObjectId = ObjectId.get()
 )
